@@ -72,9 +72,15 @@ export async function getImapAccountSummary(
 export async function getImapCredentials(
   userId: string,
   accountId: string,
-): Promise<ImapCredentials> {  const account = await prisma.account.findFirst({
+): Promise<ImapCredentials> {
+  const account = await prisma.account.findFirst({
     where: { id: accountId, userId, provider: IMAP_PROVIDER },
-    select: { id: true, providerAccountId: true, access_token: true, scope: true },
+    select: {
+      id: true,
+      providerAccountId: true,
+      access_token: true,
+      scope: true,
+    },
   });
 
   if (!account) throw new Error("找不到该邮箱，请重新连接");

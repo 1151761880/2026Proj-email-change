@@ -57,11 +57,7 @@ export const connectImapAccountAction = actionClientUser
   .inputSchema(
     z.object({
       email: z.string().trim().email("请输入正确的邮箱地址"),
-      authCode: z
-        .string()
-        .trim()
-        .min(1, "请输入授权码")
-        .max(200, "授权码过长"),
+      authCode: z.string().trim().min(1, "请输入授权码").max(200, "授权码过长"),
     }),
   )
   .action(async ({ ctx, parsedInput }) => {
@@ -106,11 +102,7 @@ export const listImapMessagesAction = actionClientUser
         ctx.userId,
         parsedInput.accountId,
       );
-      return await listInboxPage(
-        credentials,
-        parsedInput.page,
-        IMAP_PAGE_SIZE,
-      );
+      return await listInboxPage(credentials, parsedInput.page, IMAP_PAGE_SIZE);
     } catch (error) {
       ctx.logger.warn("Failed to list IMAP messages", { error });
       throw new SafeError(toFriendlyError(error));
@@ -268,17 +260,12 @@ export const syncQqMessagesAction = actionClientUser
       const fetched = await fetchInboxMessages(credentials, parsedInput.limit);
 
       for (const message of fetched) {
-        const snippet = message.text
-          .replace(/\s+/g, " ")
-          .trim()
-          .slice(0, 160);
+        const snippet = message.text.replace(/\s+/g, " ").trim().slice(0, 160);
         const data = {
           subject: message.subject,
           fromAddress: message.fromAddress,
           fromName: message.fromName,
-          receivedAt: message.receivedAt
-            ? new Date(message.receivedAt)
-            : null,
+          receivedAt: message.receivedAt ? new Date(message.receivedAt) : null,
           snippet,
           bodyText: message.text,
           unread: message.unread,

@@ -149,8 +149,10 @@ async function main() {
     ) {
       env.DEFAULT_LLMS = `openai-compatible:${localAi.ASSISTANT_MODEL}`;
       env.OPENAI_COMPATIBLE_MODEL = localAi.ASSISTANT_MODEL;
-      env.OPENAI_COMPATIBLE_BASE_URL =
-        localAi.ASSISTANT_BASE_URL.replace(/\/+$/, "");
+      env.OPENAI_COMPATIBLE_BASE_URL = localAi.ASSISTANT_BASE_URL.replace(
+        /\/+$/,
+        "",
+      );
       // JSON-schema response format is unavailable on some compatible
       // providers, so fall back to JSON mode for structured generations.
       env.OPENAI_COMPATIBLE_STRUCTURED_OUTPUTS = "false";
@@ -171,7 +173,7 @@ async function main() {
     if (realGoogle) {
       env.GOOGLE_CLIENT_ID = providerEnv.GOOGLE_CLIENT_ID;
       env.GOOGLE_CLIENT_SECRET = providerEnv.GOOGLE_CLIENT_SECRET;
-      delete env.GOOGLE_BASE_URL;
+      Reflect.deleteProperty(env, "GOOGLE_BASE_URL");
       if (providerEnv.GOOGLE_PUBSUB_TOPIC_NAME)
         env.GOOGLE_PUBSUB_TOPIC_NAME = providerEnv.GOOGLE_PUBSUB_TOPIC_NAME;
       if (providerEnv.GOOGLE_PUBSUB_VERIFICATION_TOKEN)
@@ -182,7 +184,7 @@ async function main() {
     if (realMicrosoft) {
       env.MICROSOFT_CLIENT_ID = providerEnv.MICROSOFT_CLIENT_ID;
       env.MICROSOFT_CLIENT_SECRET = providerEnv.MICROSOFT_CLIENT_SECRET;
-      delete env.MICROSOFT_BASE_URL;
+      Reflect.deleteProperty(env, "MICROSOFT_BASE_URL");
       if (providerEnv.MICROSOFT_TENANT_ID)
         env.MICROSOFT_TENANT_ID = providerEnv.MICROSOFT_TENANT_ID;
       if (providerEnv.MICROSOFT_WEBHOOK_CLIENT_STATE)

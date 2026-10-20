@@ -169,8 +169,8 @@ export function QqMailClient({
     setInbox(null);
     setSummary(null);
     setCategoryFilter("all");
-    void loadPage(accountId, 1);
-    void loadAiState(accountId);
+    loadPage(accountId, 1).catch(() => undefined);
+    loadAiState(accountId).catch(() => undefined);
   }, [accountId, loadPage, loadAiState]);
 
   function toggleSelected(uid: number, checked: boolean) {
@@ -185,7 +185,9 @@ export function QqMailClient({
   function toggleSelectAll(checked: boolean) {
     if (!inbox) return;
     setSelected(
-      checked ? new Set(inbox.messages.map((message) => message.uid)) : new Set(),
+      checked
+        ? new Set(inbox.messages.map((message) => message.uid))
+        : new Set(),
     );
   }
 
@@ -340,9 +342,7 @@ export function QqMailClient({
       if (result?.serverError) throw new Error(result.serverError);
       if (result?.data) {
         setAiState(result.data);
-        setNotice(
-          `已抓取 ${result.data.total} 封邮件，并完成 AI 分类`,
-        );
+        setNotice(`已抓取 ${result.data.total} 封邮件，并完成 AI 分类`);
       }
       await loadPage(accountId, 1);
     } catch (error) {
@@ -407,9 +407,7 @@ export function QqMailClient({
             <Button
               variant="outline"
               size="sm"
-              onClick={() =>
-                activeAccount && loadPage(activeAccount.id, page)
-              }
+              onClick={() => activeAccount && loadPage(activeAccount.id, page)}
               disabled={loadingList}
             >
               <RefreshCwIcon
@@ -584,8 +582,9 @@ export function QqMailClient({
                         <span
                           className={cn(
                             "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[11px]",
-                            CATEGORY_STYLES[message.category ?? "unclassified"] ??
-                              CATEGORY_STYLES.unclassified,
+                            CATEGORY_STYLES[
+                              message.category ?? "unclassified"
+                            ] ?? CATEGORY_STYLES.unclassified,
                           )}
                         >
                           {CATEGORY_LABELS[message.category ?? ""] ?? "未分类"}
@@ -750,14 +749,15 @@ export function QqMailClient({
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Checkbox
+                    aria-label="全选本页"
                     checked={allSelected}
                     onCheckedChange={(value) => toggleSelectAll(value === true)}
                     disabled={!inbox?.messages.length}
                   />
                   全选本页
-                </label>
+                </span>
                 <Button
                   size="sm"
                   onClick={handleArchiveSelected}

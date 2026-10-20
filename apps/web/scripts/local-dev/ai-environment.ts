@@ -12,9 +12,7 @@ const LOCAL_AI_ENVIRONMENT_KEYS = [
  * (assistant chat included), keeping every other credential out of scope.
  * Without these values the local launcher keeps using the bundled emulator.
  */
-export function readLocalAiEnvironment(
-  path: string,
-): Record<string, string> {
+export function readLocalAiEnvironment(path: string): Record<string, string> {
   if (!existsSync(path)) return {};
   const values = parse(readFileSync(path, "utf8"));
   return Object.fromEntries(

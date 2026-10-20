@@ -17,9 +17,7 @@ const PROVIDER_ENVIRONMENT_KEYS = [
  * provider's client credentials replaces its bundled emulator; leaving them
  * out keeps the demo setup unchanged.
  */
-export function readProviderEnvironment(
-  path: string,
-): Record<string, string> {
+export function readProviderEnvironment(path: string): Record<string, string> {
   if (!existsSync(path)) return {};
   const values = parse(readFileSync(path, "utf8"));
   return Object.fromEntries(

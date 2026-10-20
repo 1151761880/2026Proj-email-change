@@ -179,7 +179,7 @@ export async function getInboxMessage(
         { uid: true },
       );
 
-      if (!message || !message.source) {
+      if (!message?.source) {
         throw new Error("邮件不存在或已被移动，请刷新列表");
       }
 
@@ -277,7 +277,7 @@ export async function archiveSender(
     const lock = await client.getMailboxLock("INBOX");
     try {
       const uids = await client.search({ from }, { uid: true });
-      if (!uids || !uids.length) return 0;
+      if (!uids?.length) return 0;
 
       for (const group of chunk(uids, MOVE_CHUNK_SIZE)) {
         await client.messageMove(group.join(","), archivePath, { uid: true });
