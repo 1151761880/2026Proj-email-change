@@ -1,0 +1,52 @@
+---
+title: 邮件整理与人工确认归档
+description: 用独立模拟邮箱执行逐封分析、保护规则、确认归档和固定样本验收。
+---
+
+侧栏的“邮件整理”打开 `/<emailAccountId>/mail-triage`。页面为当前账号保存一个独立模拟邮箱，首次包含 M01—M12 十二封虚构邮件；模拟邮件和归档日志存入数据库，不操作已连接的 Gmail/Outlook，也不执行其自动规则。刷新页面后状态保留。
+
+## 模型配置
+
+在 `apps/web/.env.local` 中配置服务端变量，切勿提交密钥：
+
+```dotenv
+MAIL_TRIAGE_API_KEY=你的密钥
+MAIL_TRIAGE_BASE_URL=https://api.deepseek.com
+MAIL_TRIAGE_MODEL=deepseek-flash
+```
+
+整理页面调用真实模型分析虚构邮件，使用 JSON 模式并在应用内验证类别、邮件 ID 和逐字引用。配置与现有自动规则模型相互独立。`pnpm local:start` 只从 `.env.local` 加载这三个整理变量，其他本地环境变量继续被忽略。浏览器测试则明确替换为本地模型模拟器，不使用真实密钥。
+
+首次使用前安装依赖、生成 Prisma 客户端，并将新增迁移应用到开发数据库：
+
+```sh
+pnpm install
+pnpm -F inbox-zero-ai exec prisma generate
+pnpm -F inbox-zero-ai prisma:migrate:local
+```
+
+Windows 无需 Docker 或 WSL：初次用 Node.js 24 运行 `node apps/web/scripts/local-dev/windows-runtime.mjs`，准备项目目录内的便携 PostgreSQL/Redis；之后双击根目录 `Start-ProjectEmail.cmd`。它启动完整应用和模拟邮箱，数据保留在 `.context/local-dev/`，按 Ctrl-C 停止。macOS/Linux 继续使用 `pnpm local:start --backend native` 或原有 Docker 方式。
+
+## 操作
+
+1. 点击“生成整理建议”，查看每封邮件的分类、原文引用和解释。所有归档复选框初始为空。
+2. 仅“仅知悉”或“营销”、未星标、仍在收件箱且引用有效的邮件允许勾选。待处理、不确定和星标邮件不可勾选。
+3. 勾选邮件，点击“确认归档”，核对 ID 后点击“执行归档”。仅这些邮件移出模拟收件箱，仍在“全部邮件”中存在，并逐封记日志。
+4. 星标变化会使旧建议失效，需要重新生成。后台再次核对保存的建议、邮件状态和邮箱版本；重复提交同一个确认请求不会重复记账。
+5. 分析请求 15 秒超时，页面等待 20 秒后显示错误。失败清空旧建议及选择，保留邮件与日志，可点击“重试”。
+
+“验收工具”支持重置十二封邮件、模拟 HTTP 503/15 秒超时，以及导入合成邮件 JSON。重置和导入会清除这个模拟邮箱的建议和日志。JSON 使用数组，每项包含 `id`、`from`、`subject`、`body`、`starred`、`inbox`；ID 必须唯一，首版每批最多 50 封。导入内容会在点击分析时发送给配置的模型服务。
+
+固定样本 CSV 位于 `/fixtures/mail-triage.csv`，用于核对或转换为 JSON；它不包含预期类别。独立真值只在测试文件中保存，不发送给模型。
+
+## 专项测试
+
+```sh
+pnpm -F inbox-zero-ai test --run utils/mail-triage/schema.test.ts utils/mail-triage/service.test.ts scripts/local-dev/mail-triage-environment.test.ts
+pnpm -F inbox-zero-ai exec dotenv -e .env.local -- pnpm test-ai __tests__/ai-regression/mail-triage.test.ts
+pnpm -F inbox-zero-ai test:playwright:emulated cleanup/mail-triage.spec.ts
+```
+
+浏览器测试要求完成数据库迁移，并按现有 Playwright 说明准备一次性 PostgreSQL。测试覆盖 T1 仅归档 M02/M03、T2 星标保护与取消星标、T3 503/超时恢复和空选择。真实模型专项测试执行三次：每次分类至少 11/12 正确，M01—M04 各自正确，人工标注为待处理的四封与星标 M04 均不得成为候选，引用有效。
+
+固定样本通过只说明这些样本符合验收；新邮件仍可能被模型误分类。星标保护由代码强制执行，真实待处理邮件的识别需要独立真值验收。真实邮箱适配和自动规则协调属于后续接入工作。

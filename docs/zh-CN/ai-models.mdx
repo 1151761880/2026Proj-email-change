@@ -1,0 +1,59 @@
+---
+title: AI 模型配置
+description: 配置模型角色、服务凭据、回退顺序及独立邮件整理模型。
+---
+
+## 1. 配置范围
+
+常规 AI 由部署环境变量或账户 AI 设置配置。`pnpm local:start` 的常规 AI 使用本地模拟器，不能靠普通 `.env.local` 变量直接切换为真实服务。
+
+邮件整理另有独立模型入口，见本页第 5 节。
+
+## 2. 模型角色
+
+| 变量 | 用途 |
+| --- | --- |
+| `DEFAULT_LLMS` | 常规 AI 任务 |
+| `ECONOMY_LLMS` | 适用的经济型任务 |
+| `CHAT_LLMS` | 助手聊天 |
+| `DRAFT_LLMS` | 回复草稿 |
+| `NANO_LLMS` | 轻量分类和提取 |
+
+每项使用逗号分隔的 `provider:model` 列表，按顺序选择主模型与回退项。只有第一个冒号分隔供应商和模型；模型标识本身可以含冒号。未配置的角色按现有逻辑回退到默认或经济型配置。
+
+示意配置如下，需替换模型标识和密钥：
+
+```dotenv
+DEFAULT_LLMS=openai:替换为实际模型标识
+CHAT_LLMS=openai:替换为实际模型标识
+DRAFT_LLMS=openai:替换为实际模型标识
+OPENAI_API_KEY=填写自己的密钥
+```
+
+## 3. 供应商与凭据
+
+已有适配包括 OpenAI、Anthropic、Google、Azure、OpenRouter、Bedrock、Ollama 和 OpenAI 兼容服务等。完整列表及额外变量见 `.env.example` 和原文 `docs/hosting/llm-setup.mdx`。
+
+可使用供应商专用密钥，或适用的 `LLM_API_KEY`。OpenAI 兼容服务还需 `OPENAI_COMPATIBLE_BASE_URL`；Azure 配置中的模型部分可能对应部署名。模型是否可用取决于实际服务和账户。
+
+旧版成对的模型供应商/模型名变量仍有兼容处理，新增配置优先使用 `*_LLMS` 列表格式。
+
+## 4. 敏感信息与决策模型
+
+常规 AI 的敏感信息处理可设置允许、遮盖或阻止，见[数据与安全](/zh-CN/data-and-security)。部分分类任务还可采用 `DEFAULT_DECISION_MODEL` 指定的决策模型，失败时按既有逻辑回退。
+
+实验性本地 CLI 供应商需要额外依赖及 `CLI_LLM_ENABLED=true`。它们与已移除的仓库开发规则相互独立；当前中文文档不要求启用它们。
+
+## 5. 邮件整理专用配置
+
+```dotenv
+MAIL_TRIAGE_API_KEY=填写自己的密钥
+MAIL_TRIAGE_BASE_URL=https://api.deepseek.com
+MAIL_TRIAGE_MODEL=deepseek-flash
+```
+
+填写在 `apps/web/.env.local`。该调用路径不使用普通助手的角色配置。模型响应格式、超时与样本判据见[邮件整理说明](/zh-CN/mail-triage)和[测试说明](/zh-CN/testing)。
+
+## 6. 排查模型问题
+
+分别检查凭据、基础地址、模型标识、请求错误和回退顺序。流程模拟器输出不能证明真实模型质量；服务返回成功也不等于分类及引用内容正确。

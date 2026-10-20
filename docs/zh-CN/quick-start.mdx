@@ -1,0 +1,68 @@
+---
+title: 快速开始
+description: 在 Windows 或其他系统启动本地演示环境。
+---
+
+## 1. 运行条件
+
+- Node.js 24，首次准备便携运行环境时也须使用该主版本。
+- pnpm，版本以根目录 `package.json` 的 `packageManager` 为准。
+- 首次安装依赖和下载便携服务时需要网络连接。
+
+在项目根目录确认 Node.js 版本：
+
+```sh
+node --version
+```
+
+结果应为 `v24.x.x`。本地演示使用模拟服务，常规邮箱流程无需真实 OAuth 凭据。
+
+## 2. Windows 首次准备
+
+依次执行：
+
+```sh
+node apps/web/scripts/local-dev/windows-runtime.mjs
+pnpm install
+pnpm local:start --backend native
+```
+
+第一条命令在 `.context/native/` 中准备便携 Node.js、PostgreSQL 和 Redis。启动器将运行项目独立的服务，不注册 Windows 服务。
+
+已经准备好环境后，双击项目根目录的 `Start-ProjectEmail.cmd` 即可。该启动器优先使用项目内的便携 Node.js。
+
+## 3. 打开并登录
+
+1. 等待终端显示应用和配套服务已经就绪。
+2. 打开 `http://localhost:3000/mail`。
+3. Google 演示登录选择 `developer@example.com`；Microsoft 演示登录选择 `developer@outlook.test`。
+4. 查看模拟邮件，或进入侧栏“邮件整理”检查独立测试邮箱。
+
+以上地址为本地入口，以上账户为模拟账户。登录成功不表示已连接个人真实邮箱。
+
+## 4. 停止与再次启动
+
+在启动终端按 `Ctrl+C`，停止本次启动的应用及服务。再次运行同一命令即可。
+
+数据库和启动凭据会保留；模拟邮箱、Redis 缓存和其他模拟服务在重新启动后初始化。端口被占用时可指定另一个端口：
+
+```sh
+pnpm local:start --port 3001
+```
+
+此时按启动日志中的地址访问。
+
+## 5. macOS 与 Linux
+
+安装 Node.js 24、项目指定的 pnpm，以及 Docker Compose 或本机 PostgreSQL/Redis 后，执行：
+
+```sh
+pnpm install
+pnpm local:start
+```
+
+可用 `--backend native` 或 `--backend docker` 指定后端，用 `pnpm local:start --help` 查看参数。根目录的 `docker-compose.local.yml` 由本地启动器管理其服务参数，不应直接套用生产环境配置。
+
+## 6. 使用真实模型或邮箱
+
+邮件整理的真实模型配置见[邮件整理说明](/zh-CN/mail-triage)。真实邮箱和常规助手模型需另行配置，参见[自主部署](/zh-CN/self-hosting)。

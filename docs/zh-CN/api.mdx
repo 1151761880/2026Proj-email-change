@@ -1,0 +1,52 @@
+---
+title: 公共 API
+description: 说明公共接口的地址、账户权限、操作范围和错误格式。
+---
+
+## 1. 接口范围
+
+公共 API 提供账户范围内的规则、统计和发件人退订。部署需启用 `NEXT_PUBLIC_EXTERNAL_API_ENABLED` 并配置 `API_KEY_SALT` 等所需环境。
+
+基础路径为自己的应用地址加 `/api/v1`。中文文档的接口定义文件为 `docs/zh-CN/openapi.json`；其中服务器地址是需要替换的部署示例。
+
+## 2. 认证与权限
+
+使用在账户设置创建的账户范围 API 密钥，请求头名称为 `API-Key`。
+
+| 权限标识 | 范围 |
+| --- | --- |
+| `RULES_READ` | 查看规则 |
+| `RULES_WRITE` | 创建、替换和删除规则 |
+| `STATS_READ` | 查询统计 |
+| `SENDERS_UNSUBSCRIBE` | 发件人退订 |
+
+公共 API 密钥、内部服务的 `x-api-key` 和 MCP 的 OAuth 令牌分别用于不同入口，不应混用。
+
+## 3. 现有端点
+
+| 方法 | 相对路径 | 用途 |
+| --- | --- | --- |
+| GET | `/stats/by-period` | 按时间分组的邮件统计 |
+| GET | `/stats/response-time` | 回复时间统计 |
+| GET | `/rules` | 规则列表 |
+| POST | `/rules` | 创建规则 |
+| GET | `/rules/{id}` | 查看规则 |
+| PUT | `/rules/{id}` | 完整替换规则 |
+| DELETE | `/rules/{id}` | 删除规则 |
+| POST | `/senders/unsubscribe` | 尝试退订发件人 |
+
+## 4. 查询示例
+
+下面为 POSIX 环境示例，地址和密钥由环境提供：
+
+```sh
+curl "$APP_URL/api/v1/rules" -H "API-Key: $INBOX_ZERO_API_KEY"
+```
+
+规则替换前先读取当前规则，再依据实际接口规格构造完整请求体。不要把局部字段更新当作完整替换使用。
+
+## 5. 响应与错误
+
+错误 JSON 包含 `error.code`、`error.message` 和 `error.hint`。根据状态区分参数错误、认证、权限、未找到、限流和服务端错误。
+
+退订还须检查 `unsubscribe.success`；接口返回完成响应并不保证退订成功。请求和响应字段、枚举及权限标识以接口定义为准，中文版只调整说明文字，不翻译机器标识。

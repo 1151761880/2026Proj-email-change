@@ -1,0 +1,50 @@
+---
+title: 消息推送与后台任务
+description: 配置邮箱推送、任务消费、定时调度和消息平台回调。
+---
+
+## 1. 后台工作组成
+
+邮箱服务商推送用于通知数据变化；任务队列保存待执行工作；消费进程执行队列任务；定时调度触发摘要、跟进和已预约操作。它们需要分别配置。
+
+## 2. Gmail 推送
+
+在 Google Cloud 创建 Pub/Sub 主题，授予 `gmail-api-push@system.gserviceaccount.com` 发布权限，并建立推送订阅。推送地址为自己的应用域名：
+
+```text
+https://mail.example.com/api/google/webhook?token=配置的验证令牌
+```
+
+配置 `GOOGLE_PUBSUB_TOPIC_NAME` 和 `GOOGLE_PUBSUB_VERIFICATION_TOKEN`。主题名称使用完整资源名。原有部署允许在已有上游认证保护时显式采用空令牌；未设置与显式为空是不同状态，应按实际网关配置处理。
+
+本地模拟器不需要创建真实 Pub/Sub 资源。真实推送还需要可从服务商访问的回调地址。
+
+## 3. Outlook 推送
+
+Outlook 使用 Microsoft Graph 订阅。配置邮箱授权及 `MICROSOFT_WEBHOOK_CLIENT_STATE`，核对订阅创建、续期和通知认证。断开或权限撤销后，应重新连接对应账户并确认同步恢复。
+
+## 4. 队列消费
+
+`QUEUE_BACKEND` 指定 `bullmq`、`qstash` 或 `internal`。选择 BullMQ 时，配置 Redis 和内部应用访问凭据，并运行：
+
+```sh
+pnpm worker
+```
+
+独立 worker 需要 `REDIS_URL`、`INTERNAL_API_KEY`，以及 `INTERNAL_API_URL` 或 `NEXT_PUBLIC_BASE_URL`。消费的队列和并发等参数以 `apps/worker/src/runtime.mjs` 为准。
+
+## 5. 定时调度
+
+定时接口由调度器调用，并使用 `CRON_SECRET` 认证。根目录 Compose 中已有 cron 编排示例，覆盖预约操作、自动化任务和其他周期任务。
+
+确认调度器确实运行、调用成功且任务产生预期结果。网页进程可访问或健康检查通过，不能代替这三个层面的检查。
+
+## 6. 消息平台回调
+
+| 平台 | 主要凭据 | 事件入口 |
+| --- | --- | --- |
+| Slack | `SLACK_CLIENT_ID`、`SLACK_CLIENT_SECRET`、`SLACK_SIGNING_SECRET` | `/api/slack/events` |
+| Teams | `TEAMS_BOT_APP_ID`、`TEAMS_BOT_APP_PASSWORD`、`TEAMS_BOT_APP_TENANT_ID` | 以 `docs/teams/setup.mdx` 的消息终结点为准 |
+| Telegram | `TELEGRAM_BOT_TOKEN`、`TELEGRAM_BOT_SECRET_TOKEN` | `/api/telegram/events` |
+
+Slack 的事件订阅和交互按钮都要配置对应地址。Telegram Webhook 还需设置匹配的 `secret_token`。客户端账户连接完成后，再按[消息渠道](/zh-CN/channels)开启实际送达。

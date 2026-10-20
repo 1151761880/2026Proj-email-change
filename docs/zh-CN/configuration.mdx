@@ -1,0 +1,59 @@
+---
+title: 配置说明
+description: 区分本地演示、真实部署、品牌和邮件整理配置。
+---
+
+## 1. 配置入口
+
+| 场景 | 配置来源 |
+| --- | --- |
+| 本地演示 | 启动器生成的 `.context/local-dev/` 配置和地址 |
+| 邮件整理真实模型 | `apps/web/.env.local` 中的三个专用变量 |
+| 常规真实部署 | `apps/web/.env` 或部署平台注入的环境变量 |
+| 品牌与前端开关 | `NEXT_PUBLIC_` 前缀变量，部分变更需要重新构建前端 |
+
+`pnpm local:start` 默认采用隔离的演示配置，不覆盖已有环境文件。它只额外加载 `.env.local` 中的邮件整理模型变量；常规模型变量不能通过这个特例改变演示模式。
+
+## 2. 核心服务配置
+
+| 变量 | 含义 |
+| --- | --- |
+| `NEXT_PUBLIC_BASE_URL` | 对外访问应用的基础地址，须与 OAuth 和回调地址一致 |
+| `DATABASE_URL`、`DIRECT_URL` | PostgreSQL 连接地址 |
+| `REDIS_URL` | Redis 连接地址，BullMQ 等功能使用 |
+| `REDIS_HTTP_URL`、`REDIS_HTTP_TOKEN` | Redis HTTP 接口及访问令牌 |
+| `AUTH_SECRET` | 会话与身份验证使用的密钥 |
+| `EMAIL_ENCRYPT_SECRET`、`EMAIL_ENCRYPT_SALT` | 邮箱凭据加密材料 |
+| `INTERNAL_API_KEY` | 内部服务调用认证 |
+| `CRON_SECRET` | 定时任务调用认证 |
+| `QUEUE_BACKEND` | 任务后端：`bullmq`、`qstash` 或 `internal` |
+
+完整变量名称与约束以 `apps/web/.env.example`、`apps/web/env.ts` 及对应功能代码为准。
+
+## 3. 邮箱与模型配置
+
+Google 使用 `GOOGLE_CLIENT_ID` 和 `GOOGLE_CLIENT_SECRET`；Microsoft 使用 `MICROSOFT_CLIENT_ID`、`MICROSOFT_CLIENT_SECRET`，并可设置 `MICROSOFT_TENANT_ID`。
+
+常规 AI 使用 `DEFAULT_LLMS`，可分别配置聊天、回复草稿、经济型和轻量任务角色。具体格式见[AI 模型配置](/zh-CN/ai-models)。邮件整理使用独立的 `MAIL_TRIAGE_API_KEY`、`MAIL_TRIAGE_BASE_URL`、`MAIL_TRIAGE_MODEL`。
+
+## 4. 品牌设置
+
+```dotenv
+NEXT_PUBLIC_BRAND_NAME=十组邮件小助手
+NEXT_PUBLIC_SLACK_BOT_NAME=十组邮件小助手
+NEXT_PUBLIC_SUPPORT_EMAIL=
+# NEXT_PUBLIC_BRAND_LOGO_URL=/your-logo.svg
+# NEXT_PUBLIC_BRAND_ICON_URL=/your-icon.png
+```
+
+中文界面不改变邮箱原文、用户自定义标签、服务商名称、API 字段和数据库标识。修改前端变量后，确认部署时的构建参数与运行参数一致。
+
+## 5. 密钥管理
+
+配置文件只填写自己的部署凭据，不把真实密钥复制到文档或提交到 Git。需要生成独立随机值时，可用 Node.js 输出随机字节的十六进制表示：
+
+```sh
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
+
+加密材料的轮换会影响已保存的邮箱凭据，处理方法见[运行维护](/zh-CN/operations)。

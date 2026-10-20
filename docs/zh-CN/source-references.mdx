@@ -1,0 +1,56 @@
+---
+title: 原文、备份与参考资料
+description: 说明原始文档保存方式和中文版的资料来源。
+---
+
+## 1. 原文保存
+
+开始整理中文版前，已将 214 个文档及资源文件保存到：
+
+```text
+archives/documentation/2026-10-13-original.tar.gz
+```
+
+备份取自当时工作区，包含 `docs/` 的正文、图片、配置和接口规格，以及根目录和各模块已有的 Markdown 文档。备份解压后已逐文件核对内容。
+
+原有正文继续保留在原路径，便于追溯。文档站导航以 `docs/zh-CN/` 中的中文版为入口。
+
+## 2. 原文对应关系
+
+| 中文主题 | 原文或源码位置 |
+| --- | --- |
+| 项目与本地启动 | `README.md`、`Start-ProjectEmail.cmd`、`apps/web/scripts/local-dev/` |
+| 使用手册 | `docs/essentials/` |
+| 邮件整理 | `docs/essentials/mail-triage.mdx`、`apps/web/utils/mail-triage/` |
+| 部署与运维 | `docs/hosting/`、`docker/`、`charts/`、`copilot/` |
+| 邮箱与模型配置 | `apps/web/.env.example`、`apps/web/env.ts`、`docs/hosting/` |
+| API | `docs/openapi.json`、`docs/api-reference/` |
+| 消息渠道 | `docs/slack/`、`docs/teams/`、`docs/telegram/` |
+| 共享邮件引擎 | `packages/mail-*/README.md`、`docs/mail-packages.md` |
+| 测试 | `apps/web/__tests__/`、各模块测试及其 README |
+| 历史设计 | `docs/plans/`，需结合当前源码阅读 |
+| 上游历史 | `docs/changelog.mdx`、`docs/changelog-entries/` |
+
+## 3. 查看或恢复备份
+
+在项目根目录查看目录清单：
+
+```sh
+tar -tzf archives/documentation/2026-10-13-original.tar.gz
+```
+
+需要取回原文时，先准备单独的空目录，再解压：
+
+```sh
+tar -xzf archives/documentation/2026-10-13-original.tar.gz -C <空目录>
+```
+
+不要将解压目录直接指向正在编辑的工作区，以免覆盖当前中文文档。
+
+## 4. 文档内容的优先依据
+
+当前定制功能优先结合源码和中文说明确认；原文用于补充背景和追溯。文档中的测试命令、验收判据和设计目标，应与已有执行结果分别理解。
+
+## 5. 许可与安全资料
+
+开源许可证原文见根目录 `LICENSE`，企业扩展许可见 `apps/web/ee/LICENSE.md`。安全问题的处理渠道以实际部署维护者及 `SECURITY.md` 为准，上游联系方式不代表本定制部署已建立对应服务渠道。

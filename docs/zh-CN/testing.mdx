@@ -1,0 +1,59 @@
+---
+title: 测试说明
+description: 说明单元、模拟器、模型与真实邮箱测试的运行边界。
+---
+
+## 1. 测试分层
+
+| 类型 | 验证内容 | 主要依赖 |
+| --- | --- | --- |
+| 单元测试 | 业务规则、数据校验、状态和错误处理 | 对应模块及测试配置 |
+| 数据库测试 | 唯一约束、事务和数据库行为 | 独立 PostgreSQL 测试库 |
+| 模拟器集成测试 | 服务协议及组合流程 | 本地模拟服务 |
+| 浏览器测试 | 页面交互、状态和错误恢复 | Playwright、隔离数据库及模拟服务 |
+| 真实模型测试 | 分类、内容和引用等模型行为 | 实际模型配置 |
+| 真实邮箱端到端测试 | 服务商侧投递、回调和邮件操作 | 受控真实邮箱及完整授权 |
+
+各类结果分别解释。模拟器的预设答案不能替代真实模型测试，页面成功提示也不能替代服务商侧结果。
+
+## 2. 针对性命令
+
+安装依赖并按对应套件准备环境后，选择实际需要的命令：
+
+```sh
+pnpm test path/to/test-file.test.ts
+pnpm test-integration
+pnpm -F inbox-zero-ai test-db
+pnpm -F inbox-zero-ai test:playwright:emulated mail/layout.spec.ts
+pnpm --filter inbox-zero-ai test-ai __tests__/eval/your-test.test.ts
+```
+
+数据库和真实服务测试需要对应环境变量；对演示模式的配置不能自动作同样假设。更细的准备方式见各测试目录已有 README。
+
+## 3. 浏览器证据
+
+模拟浏览器测试按场景保存截图和浏览器状态证据。界面修改后查看相关截图，并检查页面错误、网络失败和最终状态。
+
+使用能够捕捉实际行为回归的测试，避免仅重复实现细节。已有证据能覆盖未改变的行为时，不必重复执行。
+
+## 4. 邮件整理专项检查
+
+```sh
+pnpm -F inbox-zero-ai test --run utils/mail-triage/schema.test.ts utils/mail-triage/service.test.ts scripts/local-dev/mail-triage-environment.test.ts
+pnpm -F inbox-zero-ai exec dotenv -e .env.local -- pnpm test-ai __tests__/ai-regression/mail-triage.test.ts
+pnpm -F inbox-zero-ai test:playwright:emulated cleanup/mail-triage.spec.ts
+```
+
+已有固定样本验收要求包括：
+
+- 默认无归档选择，T1 只归档 M02/M03。
+- 星标保护及取消星标后重新分析。
+- HTTP 503、超时和空选择的处理与恢复。
+- 真实模型检查执行三次，每次至少 11/12 分类正确，M01—M04 各自正确。
+- 真值为待处理的四封邮件及星标 M04 不成为归档候选，原文引用有效。
+
+以上是测试定义与判据，不是本次文档整理的执行结果。通过固定样本只说明该样本范围，不能证明新邮件均能正确分类。
+
+## 5. 记录结果
+
+说明实际命令、运行环境、模型/服务来源及通过、失败、跳过的数量。引用历史结果时注明来源和时间；未执行的真实服务场景保留为未验证。

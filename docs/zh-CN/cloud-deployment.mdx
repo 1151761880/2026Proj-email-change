@@ -1,0 +1,44 @@
+---
+title: 云端部署
+description: 说明已有云平台部署方案、资源位置和当前定制版的适用条件。
+---
+
+## 1. 选择已有方案
+
+| 环境 | 仓库中的资源 | 主要配套 |
+| --- | --- | --- |
+| Docker/VPS | `docker/`、根目录 Compose | 数据库、Redis、任务消费及调度 |
+| Vercel | `packages/cli/src/setup-vercel.ts`、`docs/hosting/vercel.mdx` | 外部数据库/Redis、受支持的后台任务服务 |
+| Kubernetes | `charts/inbox-zero/` | Secret、持久卷、网络入口、任务进程 |
+| AWS EC2 | `docs/hosting/ec2-deployment.mdx` | VM、容器、数据及网络 |
+| AWS Terraform | `packages/cli/src/setup-terraform.ts`、原始 Terraform 说明 | 实际选择的云资源及状态存储 |
+| AWS ECS/Copilot | `copilot/` | 应用服务、数据库/Redis及可选网关 |
+| GCP 与 Cloudflare Tunnel | `docs/hosting/gcp-cloudflare-tunnel.mdx` | VM、容器、隧道与公共域名 |
+
+这些是可用的部署资料和模板。本次中文文档整理没有向云平台创建资源或验证这些环境。
+
+## 2. 定制源码与镜像
+
+部署当前中文版时，使用当前源码或由其构建的镜像。平台文档中的上游镜像、仓库和示例域名须按自己的部署调整，不能把上游应用的上线状态当成当前定制版状态。
+
+## 3. 不同平台的运行要求
+
+常驻 VM、容器和 Kubernetes 可部署独立 worker、定时调度及数据库。函数平台需选用适合其执行时间和生命周期的后台机制，不能依赖请求结束后仍在运行的本机进程。
+
+Webhook 地址、OAuth 回调、应用基础地址和外部客户端访问地址须保持一致。使用隧道或网关时，明确其转发和认证范围。
+
+## 4. Kubernetes
+
+Chart 位于 `charts/inbox-zero/`，默认配置见 `values.yaml`。部署前按实际镜像、密钥、存储、数据库/Redis 和后台任务填写值文件。敏感值放在对应 Secret 或受保护的部署环境中。
+
+同时确认网页、消费进程及调度组件，而不只查看网页 Pod 是否就绪。
+
+## 5. AWS 与 GCP
+
+AWS 的 EC2、Terraform 和 Copilot 路径分别对应不同部署方式。Copilot 文档还包含受限网络中转发邮箱推送的方案；选用时结合当前配置确认入口与认证。
+
+GCP/Cloudflare 方案通过隧道暴露应用服务，仍需配置自己的域名和邮箱回调。原文中的资源规格、工具命令和权限设置应按实际账户核对。
+
+## 6. 部署后的确认
+
+检查应用版本、数据库迁移、外部回调、模型、任务消费、定时调度和备份恢复。记录实际运行结果，不用模板中的示例输出代替部署结果。

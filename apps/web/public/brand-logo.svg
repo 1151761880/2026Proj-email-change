@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="224" height="28" viewBox="0 0 224 28">
+  <g fill="none" stroke="#2563eb" stroke-width="2" stroke-linejoin="round">
+    <rect x="1" y="4" width="25" height="20" rx="4"/>
+    <path d="m2 6 11.5 9L25 6"/>
+  </g>
+  <text x="34" y="22" fill="#0f172a" font-size="24" font-weight="600" font-family="Microsoft YaHei, PingFang SC, sans-serif" textLength="188" lengthAdjust="spacingAndGlyphs">十组邮件小助手</text>
+</svg>

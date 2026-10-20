@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#f5f8ff"/>
+  <circle cx="1100" cy="90" r="210" fill="#e8efff"/>
+  <circle cx="80" cy="600" r="200" fill="#e8efff"/>
+  <rect x="518" y="95" width="164" height="128" rx="30" fill="#2563eb"/>
+  <path d="M542 129h116v64H542z" fill="none" stroke="white" stroke-width="8" stroke-linejoin="round"/>
+  <path d="m542 131 58 43 58-43" fill="none" stroke="white" stroke-width="8" stroke-linejoin="round"/>
+  <g font-family="Microsoft YaHei, PingFang SC, sans-serif" text-anchor="middle">
+    <text x="600" y="335" font-size="68" font-weight="700" fill="#0f172a">十组邮件小助手</text>
+    <text x="600" y="409" font-size="30" fill="#475569">智能分类 · 回复草稿 · 批量归档</text>
+    <text x="600" y="516" font-size="25" fill="#64748b">让邮件井然有序，让工作更加专注</text>
+  </g>
+</svg>

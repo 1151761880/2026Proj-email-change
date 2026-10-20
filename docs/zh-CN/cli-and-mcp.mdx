@@ -1,0 +1,41 @@
+---
+title: 命令行与 MCP 接入
+description: 介绍暂存的外部接入包及以后启用时的连接方法。
+---
+
+## 1. 当前状态
+
+外部接入包保存在 `extras/ai-integrations/`，没有仓库根目录的插件发现入口，当前不要求启用。常规邮件助手和邮件整理的模型调用不依赖这些包。
+
+## 2. API 命令行
+
+API 工具包为 `@inbox-zero/api`，命令名为 `inbox-zero-api`。它包装公共 API 的规则和统计等操作。
+
+需要时安装，并指定自己的部署地址：
+
+```sh
+npm install -g @inbox-zero/api
+inbox-zero-api config set base-url https://mail.example.com
+inbox-zero-api openapi --json
+inbox-zero-api rules list --json
+```
+
+认证密钥通过 `INBOX_ZERO_API_KEY` 提供。工具的默认地址仍属于上游服务，自主部署必须检查基础地址。
+
+配置优先级为命令参数、环境变量、用户配置文件。更新规则前读取当前内容，再构造完整请求；详细命令参考保存在暂存的 API 技能包中。
+
+## 3. MCP 服务
+
+MCP 让外部 AI 客户端搜索和阅读邮箱、生成草稿、管理规则和查看统计。部署启用需要公共 API、`MCP_SERVER_ENABLED=true` 和对应认证配置，端点为自己的 HTTPS 应用地址加 `/mcp`。
+
+客户端需要支持 Streamable HTTP、OAuth 授权码流程、S256 PKCE、动态客户端注册和资源标识。MCP 使用 OAuth，不接受普通 API 密钥代替。
+
+## 4. 草稿与发送权限
+
+默认工具生成邮箱草稿。发送需要客户端另获 `mcp:send` 权限，按实际授权界面处理。暂存插件的说明主要使用搜索、阅读和草稿流程，不能据其文字推断整个服务不存在发送能力。
+
+## 5. 停用与恢复
+
+在账户设置断开客户端或关闭 MCP，可撤销相应访问。退出浏览器登录并不自动撤销客户端刷新令牌。
+
+恢复仓库插件时，按 `extras/ai-integrations/` 内的 README 操作。Windows 中原始技能软链接可能被检出为文本占位文件，恢复自动发现时需处理实际链接，不要仅复制路径文字。

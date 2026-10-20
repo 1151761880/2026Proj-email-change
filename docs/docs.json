@@ -1,0 +1,136 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "十组邮件小助手中文文档",
+  "colors": {
+    "primary": "#2563eb",
+    "light": "#60a5fa",
+    "dark": "#2563eb"
+  },
+  "favicon": "/favicon.png",
+  "navigation": {
+    "anchors": [
+      {
+        "anchor": "项目与使用",
+        "icon": "book-open",
+        "groups": [
+          {
+            "group": "项目说明",
+            "pages": [
+              "zh-CN/overview",
+              "zh-CN/quick-start",
+              "zh-CN/architecture",
+              "zh-CN/glossary"
+            ]
+          },
+          {
+            "group": "邮箱与智能助手",
+            "pages": [
+              "zh-CN/mail",
+              "zh-CN/assistant",
+              "zh-CN/mail-triage",
+              "zh-CN/cleanup",
+              "zh-CN/drafts-and-follow-up"
+            ]
+          },
+          {
+            "group": "日历与协作",
+            "pages": [
+              "zh-CN/calendar-and-meetings",
+              "zh-CN/attachments-and-integrations",
+              "zh-CN/channels",
+              "zh-CN/accounts-and-team",
+              "zh-CN/clients"
+            ]
+          },
+          {
+            "group": "数据与安全",
+            "pages": [
+              "zh-CN/data-and-security"
+            ]
+          }
+        ]
+      },
+      {
+        "anchor": "部署与开发",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "部署准备",
+            "pages": [
+              "zh-CN/configuration",
+              "zh-CN/self-hosting",
+              "zh-CN/oauth",
+              "zh-CN/ai-models"
+            ]
+          },
+          {
+            "group": "后台与运维",
+            "pages": [
+              "zh-CN/jobs-and-webhooks",
+              "zh-CN/cloud-deployment",
+              "zh-CN/operations",
+              "zh-CN/troubleshooting"
+            ]
+          },
+          {
+            "group": "开发与接口",
+            "pages": [
+              "zh-CN/development",
+              "zh-CN/testing",
+              "zh-CN/mail-engine",
+              "zh-CN/api",
+              "zh-CN/cli-and-mcp"
+            ]
+          },
+          {
+            "group": "版本与参考",
+            "pages": [
+              "zh-CN/version-history",
+              "zh-CN/source-references"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "变更说明",
+          "href": "/zh-CN/version-history",
+          "icon": "clock-rotate-left"
+        },
+        {
+          "anchor": "原文与备份",
+          "href": "/zh-CN/source-references",
+          "icon": "box-archive"
+        }
+      ]
+    }
+  },
+  "logo": {
+    "light": "/logo/shizu.svg",
+    "dark": "/logo/shizu-dark.svg"
+  },
+  "api": {
+    "openapi": "zh-CN/openapi.json"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "文档概览",
+        "href": "/zh-CN/overview"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "本地应用",
+      "href": "http://localhost:3000/mail"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/elie222/inbox-zero"
+    }
+  }
+}

@@ -1,0 +1,59 @@
+---
+title: 邮箱授权配置
+description: 配置 Google 与 Microsoft 的 OAuth 应用、回调地址和功能权限。
+---
+
+## 1. 基础要求
+
+授权应用的回调地址必须与实际部署地址一致。以下用 `http://localhost:3000` 说明本地地址，部署后统一替换为自己的 HTTPS 地址。
+
+本地模拟登录由启动器提供，不需要创建这些真实授权应用。
+
+## 2. Google 授权
+
+在 Google Cloud 项目中配置 OAuth 同意页面，并创建 Web 应用类型的客户端。内部应用面向相应 Google Workspace 组织；外部应用需按其发布状态设置可登录的测试用户。
+
+填写客户端 ID 和密钥：
+
+```dotenv
+GOOGLE_CLIENT_ID=填写客户端ID
+GOOGLE_CLIENT_SECRET=填写客户端密钥
+```
+
+根据要使用的功能登记回调：
+
+| 功能 | 回调路径 |
+| --- | --- |
+| 登录 | `/api/auth/callback/google` |
+| 连接邮箱 | `/api/google/linking/callback` |
+| 日历 | `/api/google/calendar/callback` |
+| 云盘 | `/api/google/drive/callback` |
+
+核心登录及邮件权限包括用户资料、邮箱地址、`gmail.modify` 和 `gmail.settings.basic`。日历、Drive 和联系人权限按启用功能添加，并启用对应 API。
+
+Drive 标准访问使用 `drive.file`；完整访问使用 `drive`。联系人建议需要相应 People API 和联系人权限。域名、回调和权限变更后，已有账户可能需要重新授权。
+
+## 3. Microsoft 授权
+
+在 Microsoft Entra ID 中注册 Web 应用，按目标用户选择多租户或单租户类型。保存客户端密钥的实际值，并配置：
+
+```dotenv
+MICROSOFT_CLIENT_ID=填写应用客户端ID
+MICROSOFT_CLIENT_SECRET=填写客户端密钥值
+MICROSOFT_TENANT_ID=单租户时填写租户ID
+```
+
+| 功能 | 回调路径 |
+| --- | --- |
+| 登录 | `/api/auth/callback/microsoft` |
+| 连接邮箱 | `/api/outlook/linking/callback` |
+| 日历 | `/api/outlook/calendar/callback` |
+| 云盘 | `/api/outlook/drive/callback` |
+
+使用委托权限配置身份、离线访问和所需 Microsoft Graph 能力，包括 `User.Read`、`Mail.ReadWrite`、`Mail.Send`、`MailboxSettings.ReadWrite`；日历、文件和联系人按功能配置。受管理租户还可能需要管理员同意。
+
+## 4. 收到授权错误时
+
+按顺序核对应用类型、当前登录账户、完整回调 URI、密钥有效期及目标权限。回调路径只有部分一致仍会失败，协议、主机和端口也须匹配。
+
+详细原始权限清单保存在 `docs/hosting/google-oauth.mdx` 和 `docs/hosting/microsoft-oauth.mdx`；服务商控制台的布局以实际页面为准。

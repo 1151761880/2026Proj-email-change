@@ -1,0 +1,50 @@
+"use client";
+
+import { useOnboarding } from "@/components/OnboardingModal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { CardBasic } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { TagsIcon, ArchiveIcon, ZapIcon } from "lucide-react";
+
+export function SmartCategoriesOnboarding() {
+  const { isOpen, setIsOpen, onClose } = useOnboarding("SmartCategories");
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>发件人分类</DialogTitle>
+          <DialogDescription>
+            自动为发件人分类，方便管理收件箱和执行自动化。
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-2 sm:gap-4">
+          <CardBasic className="flex items-center">
+            <TagsIcon className="mr-3 h-5 w-5" />
+            自动分类发件人
+          </CardBasic>
+          <CardBasic className="flex items-center">
+            <ArchiveIcon className="mr-3 h-5 w-5" />
+            按分类批量归档
+          </CardBasic>
+          <CardBasic className="flex items-center">
+            <ZapIcon className="mr-3 h-5 w-5" />
+            使用分类优化智能助手
+          </CardBasic>
+        </div>
+        <div>
+          <Button className="w-full" onClick={onClose}>
+            开始使用
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

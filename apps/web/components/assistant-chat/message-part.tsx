@@ -1,0 +1,1036 @@
+"use client";
+
+import Image from "next/image";
+import type { ReactNode } from "react";
+import { AssistantInlineEmailResponse } from "@/components/assistant-chat/assistant-inline-email-response";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
+import {
+  AddToKnowledgeBase,
+  BasicToolInfo,
+  CreatedRuleToolCard,
+  PendingDeleteRuleToolCard,
+  PendingSaveMemoryToolCard,
+  PendingCreateRuleToolCard,
+  ForwardEmailResult,
+  getManageInboxActionLabel,
+  ManageInboxResult,
+  ManageSenderCategoryResult,
+  ReadEmailResult,
+  ReplyEmailResult,
+  SearchInboxResult,
+  SendEmailResult,
+  UpdatePersonalInstructions,
+  UpdatedLearnedPatterns,
+  UpdatedRule,
+  UpdatedRuleActions,
+  UpdatedRuleConditions,
+  UpdatedRuleState,
+} from "@/components/assistant-chat/tools";
+import type { ChatMessage } from "@/components/assistant-chat/types";
+import type { ThreadLookup } from "@/components/assistant-chat/tools";
+import { formatToolLabel } from "@/components/assistant-chat/tool-label";
+import {
+  isManageInboxAction,
+  type ManageInboxAction,
+  requiresThreadIds,
+} from "@/utils/ai/assistant/manage-inbox-actions";
+import type { DeleteRuleOutput } from "@/utils/ai/assistant/tools/rules/delete-rule-tool";
+import { getUserVisibleToolFailureMessage } from "@/utils/ai/assistant/chat-response-guard";
+import { pluralize } from "@/utils/string";
+
+interface MessagePartProps {
+  disableConfirm: boolean;
+  isPersistedMessage: boolean;
+  isStreaming: boolean;
+  messageId: string;
+  part: ChatMessage["parts"][0];
+  partIndex: number;
+  threadLookup: ThreadLookup;
+}
+
+type LegacyRuleToolPart =
+  | {
+      type: "tool-updateRuleConditions";
+      toolCallId: string;
+      state: string;
+      input: Parameters<typeof UpdatedRuleConditions>[0]["args"];
+      output?: unknown;
+    }
+  | {
+      type: "tool-updateRuleActions";
+      toolCallId: string;
+      state: string;
+      input: Parameters<typeof UpdatedRuleActions>[0]["args"];
+      output?: unknown;
+    };
+
+type ManageInboxInputForDisplay = {
+  action: ManageInboxAction;
+  fromEmails?: string[] | null;
+  label?: string | null;
+  labelName?: string | null;
+  read?: boolean | null;
+  threadIds?: string[] | null;
+};
+
+type LegacyUpdateRuleStatePart = {
+  type: "tool-updateRuleState";
+  toolCallId: string;
+  state: string;
+  input: Parameters<typeof UpdatedRuleState>[0]["args"];
+  output?: unknown;
+};
+
+type LegacyUpdateRuleStateOutput = Parameters<
+  typeof UpdatedRuleState
+>[0]["output"];
+
+function isLegacyUpdateRuleStatePart(
+  part: unknown,
+): part is LegacyUpdateRuleStatePart {
+  return (
+    typeof part === "object" &&
+    part !== null &&
+    "type" in part &&
+    part.type === "tool-updateRuleState"
+  );
+}
+
+function ErrorToolCard({ error }: { error: string }) {
+  return <div className="text-xs text-muted-foreground">错误： {error}</div>;
+}
+
+function renderToolError(toolCallId: string, output: unknown) {
+  const failureMessage = getToolFailureMessage(output);
+  return failureMessage ? (
+    <ErrorToolCard key={toolCallId} error={failureMessage} />
+  ) : null;
+}
+
+function isOutputWithError(output: unknown): output is { error: unknown } {
+  return typeof output === "object" && output !== null && "error" in output;
+}
+
+function isDeleteRuleOutput(output: unknown): output is DeleteRuleOutput {
+  return (
+    typeof output === "object" &&
+    output !== null &&
+    "success" in output &&
+    typeof output.success === "boolean"
+  );
+}
+
+function isLegacyUpdateRuleStateOutput(
+  output: unknown,
+): output is LegacyUpdateRuleStateOutput {
+  return isDeleteRuleOutput(output);
+}
+
+function getOutputField<T>(output: unknown, field: string): T | undefined {
+  if (typeof output === "object" && output !== null && field in output) {
+    return (output as Record<string, unknown>)[field] as T;
+  }
+}
+
+export function MessagePart({
+  part,
+  isStreaming,
+  disableConfirm,
+  isPersistedMessage,
+  messageId,
+  partIndex,
+  threadLookup,
+}: MessagePartProps) {
+  const key = `${messageId}-${partIndex}`;
+
+  if (part.type === "reasoning") {
+    // Skip rendering if reasoning is redacted (limited token output from provider)
+    if (!part.text || part.text === "[REDACTED]") return null;
+    return (
+      <Reasoning key={key} isStreaming={isStreaming} className="w-full">
+        <ReasoningTrigger />
+        <ReasoningContent>{part.text}</ReasoningContent>
+      </Reasoning>
+    );
+  }
+
+  if (part.type === "text") {
+    const text = part.text;
+    if (!text) return null;
+    return (
+      <AssistantInlineEmailResponse key={key}>
+        {text}
+      </AssistantInlineEmailResponse>
+    );
+  }
+
+  if (part.type === "file") {
+    if (part.mediaType.startsWith("image")) {
+      return (
+        <a
+          key={key}
+          href={part.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block"
+        >
+          <Image
+            src={part.url}
+            alt={part.filename ?? "attachment"}
+            width={256}
+            height={256}
+            className="max-h-64 max-w-full rounded-lg border object-contain"
+            unoptimized
+          />
+        </a>
+      );
+    }
+    return (
+      <div
+        key={key}
+        className="inline-flex items-center gap-2 rounded-lg border bg-muted px-3 py-2 text-sm"
+      >
+        {part.filename ?? "File"}
+      </div>
+    );
+  }
+
+  // Tool handling
+  if (part.type === "tool-getAccountOverview") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在加载账户概况…",
+      renderSuccess: ({ toolCallId }) => (
+        <BasicToolInfo key={toolCallId} text="账户概况已加载" />
+      ),
+    });
+  }
+
+  if (part.type === "tool-getAssistantCapabilities") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在加载助手功能…",
+      renderSuccess: ({ toolCallId }) => (
+        <BasicToolInfo key={toolCallId} text="助手功能已加载" />
+      ),
+    });
+  }
+
+  if (part.type === "tool-updateAssistantSettings") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在更新设置…",
+      renderSuccess: ({ toolCallId, output }) => {
+        const appliedChanges = getOutputField<Array<unknown>>(
+          output,
+          "appliedChanges",
+        );
+        const appliedChangesCount = Array.isArray(appliedChanges)
+          ? appliedChanges.length
+          : null;
+        return (
+          <BasicToolInfo
+            key={toolCallId}
+            text={`设置已更新${
+              appliedChangesCount !== null
+                ? `（${appliedChangesCount} 项更改）`
+                : ""
+            }`}
+          />
+        );
+      },
+    });
+  }
+
+  if (part.type === "tool-searchInbox") {
+    const { toolCallId, state } = part;
+    if (state === "input-available") {
+      return <BasicToolInfo key={toolCallId} text="正在搜索收件箱…" />;
+    }
+    if (state === "output-available") {
+      return <SearchInboxResult key={toolCallId} output={part.output} />;
+    }
+  }
+
+  if (part.type === "tool-readEmail") {
+    const { toolCallId, state } = part;
+    if (state === "input-available") {
+      return <BasicToolInfo key={toolCallId} text="正在读取邮件…" />;
+    }
+    if (state === "output-available") {
+      const { output } = part;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+      return <ReadEmailResult key={toolCallId} output={output} />;
+    }
+  }
+
+  if (part.type === "tool-manageInbox") {
+    const { toolCallId, state } = part;
+    const input = getManageInboxInputForDisplay(part.input);
+
+    if (state === "input-available") {
+      if (!input) {
+        return <BasicToolInfo key={toolCallId} text="正在更新收件箱…" />;
+      }
+
+      if (
+        (input.action === "bulk_archive_senders" ||
+          input.action === "unsubscribe_senders") &&
+        input.fromEmails?.length
+      ) {
+        return (
+          <ManageInboxResult
+            key={toolCallId}
+            input={input}
+            output={getInProgressManageInboxOutput(input)}
+            threadLookup={threadLookup}
+            isInProgress
+          />
+        );
+      }
+
+      const actionText = getManageInboxActionLabel({
+        action: input.action,
+        read: input.read ?? true,
+        labelApplied:
+          input.action === "archive_threads"
+            ? Boolean(input.label)
+            : Boolean(input.label || input.labelName),
+        inProgress: true,
+      });
+
+      return <BasicToolInfo key={toolCallId} text={actionText} />;
+    }
+    if (state === "output-available") {
+      const { output } = part;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+      return (
+        <ManageInboxResult
+          key={toolCallId}
+          input={input ?? undefined}
+          output={output}
+          threadIds={
+            input && requiresThreadIds(input.action)
+              ? (input.threadIds ?? undefined)
+              : undefined
+          }
+          threadLookup={threadLookup}
+        />
+      );
+    }
+  }
+
+  if (part.type === "tool-sendEmail") {
+    return renderPendingEmailAction({
+      part,
+      disableConfirm,
+      isPersistedMessage,
+      messageId,
+      preparingText: "正在准备邮件…",
+      ResultComponent: SendEmailResult,
+    });
+  }
+
+  if (part.type === "tool-replyEmail") {
+    return renderPendingEmailAction({
+      part,
+      disableConfirm,
+      isPersistedMessage,
+      messageId,
+      preparingText: "正在准备回复…",
+      ResultComponent: ReplyEmailResult,
+    });
+  }
+
+  if (part.type === "tool-forwardEmail") {
+    return renderPendingEmailAction({
+      part,
+      disableConfirm,
+      isPersistedMessage,
+      messageId,
+      preparingText: "正在准备转发…",
+      ResultComponent: ForwardEmailResult,
+    });
+  }
+
+  if (part.type === "tool-getUserRulesAndSettings") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在读取规则和设置…",
+      renderSuccess: ({ toolCallId }) => (
+        <BasicToolInfo key={toolCallId} text="规则和设置已读取" />
+      ),
+    });
+  }
+
+  if (part.type === "tool-getRuleExecutionForMessage") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在读取规则执行详情…",
+      renderSuccess: ({ toolCallId }) => (
+        <BasicToolInfo key={toolCallId} text="规则执行详情已读取" />
+      ),
+    });
+  }
+
+  if (part.type === "tool-getLearnedPatterns") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在读取学习规律…",
+      renderSuccess: ({ toolCallId }) => (
+        <BasicToolInfo key={toolCallId} text="学习规律已读取" />
+      ),
+    });
+  }
+
+  if (part.type === "tool-createRule") {
+    const { toolCallId, state } = part;
+    if (state === "input-available") {
+      return (
+        <BasicToolInfo
+          key={toolCallId}
+          text={`正在创建规则“${part.input.name}”…`}
+        />
+      );
+    }
+    if (state === "output-available") {
+      const { output } = part;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+      const requiresRuleConfirmation =
+        getOutputField<boolean>(output, "requiresConfirmation") === true &&
+        getOutputField<string>(output, "actionType") === "create_rule";
+      const confirmationState =
+        getOutputField<string>(output, "confirmationState") || "";
+      if (
+        requiresRuleConfirmation &&
+        (confirmationState === "pending" || confirmationState === "processing")
+      ) {
+        return (
+          <PendingCreateRuleToolCard
+            key={toolCallId}
+            args={part.input}
+            output={output}
+            chatMessageId={messageId}
+            toolCallId={toolCallId}
+            disableConfirm={disableConfirm || !isPersistedMessage}
+          />
+        );
+      }
+      const ruleId = getOutputField<string>(output, "ruleId");
+      return (
+        <CreatedRuleToolCard
+          key={toolCallId}
+          args={part.input}
+          ruleId={ruleId}
+        />
+      );
+    }
+  }
+
+  // These tools are no longer exposed to the assistant; updateRule replaces
+  // them. Keep render-only support so older persisted chat messages still show
+  // their historical tool cards instead of falling through to raw JSON.
+  const legacyRulePart = part as unknown as LegacyRuleToolPart;
+
+  if (legacyRulePart.type === "tool-updateRuleConditions") {
+    const { toolCallId, state } = legacyRulePart;
+    if (state === "input-available") {
+      return (
+        <BasicToolInfo
+          key={toolCallId}
+          text={`正在更新规则“${legacyRulePart.input.ruleName}”的条件…`}
+        />
+      );
+    }
+    if (state === "output-available") {
+      const { output } = legacyRulePart;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+      if (!isLegacyUpdateRuleStateOutput(output)) {
+        return <ErrorToolCard key={toolCallId} error="缺少规则更新详情" />;
+      }
+      const ruleId = getOutputField<string>(output, "ruleId");
+      if (!ruleId)
+        return <ErrorToolCard key={toolCallId} error="响应中缺少规则 ID" />;
+      return (
+        <UpdatedRuleConditions
+          key={toolCallId}
+          args={legacyRulePart.input}
+          ruleId={ruleId}
+          originalConditions={getOutputField(output, "originalConditions")}
+          updatedConditions={getOutputField(output, "updatedConditions")}
+        />
+      );
+    }
+  }
+
+  if (legacyRulePart.type === "tool-updateRuleActions") {
+    const { toolCallId, state } = legacyRulePart;
+    if (state === "input-available") {
+      return (
+        <BasicToolInfo
+          key={toolCallId}
+          text={`正在更新规则“${legacyRulePart.input.ruleName}”的操作…`}
+        />
+      );
+    }
+    if (state === "output-available") {
+      const { output } = legacyRulePart;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+      const ruleId = getOutputField<string>(output, "ruleId");
+      if (!ruleId)
+        return <ErrorToolCard key={toolCallId} error="响应中缺少规则 ID" />;
+      return (
+        <UpdatedRuleActions
+          key={toolCallId}
+          args={legacyRulePart.input}
+          ruleId={ruleId}
+          originalActions={getOutputField(output, "originalActions")}
+          updatedActions={getOutputField(output, "updatedActions")}
+        />
+      );
+    }
+  }
+
+  if (part.type === "tool-updateRule") {
+    const { toolCallId, state } = part;
+    if (state === "input-available") {
+      return (
+        <BasicToolInfo
+          key={toolCallId}
+          text={`正在更新规则“${part.input.ruleName}”…`}
+        />
+      );
+    }
+    if (state === "output-available") {
+      const { output } = part;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+      return <UpdatedRule key={toolCallId} args={part.input} output={output} />;
+    }
+  }
+
+  if (part.type === "tool-deleteRule") {
+    const { toolCallId, state } = part;
+    if (state === "input-available") {
+      return (
+        <BasicToolInfo
+          key={toolCallId}
+          text={`准备删除规则“${part.input.ruleName}”…`}
+        />
+      );
+    }
+    if (state === "output-available") {
+      const { output } = part;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+      const ruleId = getOutputField<string>(output, "ruleId");
+      if (!ruleId)
+        return <ErrorToolCard key={toolCallId} error="响应中缺少规则 ID" />;
+
+      const requiresDeleteConfirmation =
+        getOutputField<boolean>(output, "requiresConfirmation") === true &&
+        getOutputField<string>(output, "actionType") === "delete_rule";
+      if (requiresDeleteConfirmation) {
+        if (!isDeleteRuleOutput(output)) {
+          return (
+            <ErrorToolCard key={toolCallId} error="缺少删除规则确认详情" />
+          );
+        }
+
+        return (
+          <PendingDeleteRuleToolCard
+            key={toolCallId}
+            args={part.input}
+            output={output}
+            disableConfirm={disableConfirm || !isPersistedMessage}
+          />
+        );
+      }
+
+      const ruleName = getOutputField<string>(output, "ruleName");
+      return (
+        <BasicToolInfo
+          key={toolCallId}
+          text={`已删除规则“${ruleName || part.input.ruleName}”`}
+        />
+      );
+    }
+  }
+
+  const legacyPart = part as unknown;
+  if (isLegacyUpdateRuleStatePart(legacyPart)) {
+    const { toolCallId, state } = legacyPart;
+    if (state === "input-available") {
+      const verb =
+        legacyPart.input.operation === "delete"
+          ? "Preparing to delete"
+          : legacyPart.input.operation === "enable"
+            ? "Enabling"
+            : "Disabling";
+      return (
+        <BasicToolInfo
+          key={toolCallId}
+          text={`正在处理规则“${legacyPart.input.ruleName}”…`}
+        />
+      );
+    }
+    if (state === "output-available") {
+      const { output } = legacyPart;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+      if (!isLegacyUpdateRuleStateOutput(output)) {
+        return <ErrorToolCard key={toolCallId} error="缺少规则更新详情" />;
+      }
+      const ruleId = getOutputField<string>(output, "ruleId");
+      if (!ruleId)
+        return <ErrorToolCard key={toolCallId} error="响应中缺少规则 ID" />;
+
+      const requiresDeleteConfirmation =
+        getOutputField<boolean>(output, "requiresConfirmation") === true &&
+        getOutputField<string>(output, "actionType") === "delete_rule";
+      if (requiresDeleteConfirmation) {
+        if (!isDeleteRuleOutput(output)) {
+          return (
+            <ErrorToolCard key={toolCallId} error="缺少删除规则确认详情" />
+          );
+        }
+
+        return (
+          <PendingDeleteRuleToolCard
+            key={toolCallId}
+            args={legacyPart.input}
+            output={output}
+            disableConfirm={disableConfirm || !isPersistedMessage}
+          />
+        );
+      }
+
+      return (
+        <UpdatedRuleState
+          key={toolCallId}
+          args={legacyPart.input}
+          output={output}
+        />
+      );
+    }
+  }
+
+  if (part.type === "tool-updateLearnedPatterns") {
+    const { toolCallId, state } = part;
+    if (state === "input-available") {
+      return (
+        <BasicToolInfo
+          key={toolCallId}
+          text={`正在更新规则“${part.input.ruleName}”的学习规律…`}
+        />
+      );
+    }
+    if (state === "output-available") {
+      const { output } = part;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+      const ruleId = getOutputField<string>(output, "ruleId");
+      if (!ruleId)
+        return <ErrorToolCard key={toolCallId} error="响应中缺少规则 ID" />;
+      return (
+        <UpdatedLearnedPatterns
+          key={toolCallId}
+          args={part.input}
+          ruleId={ruleId}
+        />
+      );
+    }
+  }
+
+  if (part.type === "tool-updatePersonalInstructions") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在更新个人指令…",
+      renderSuccess: ({ toolCallId, output }) => {
+        const updated = getOutputField<string>(output, "updated");
+        return (
+          <UpdatePersonalInstructions
+            key={toolCallId}
+            args={{
+              personalInstructions:
+                updated ??
+                part.input?.personalInstructions ??
+                "Personal instructions updated.",
+              mode: part.input?.mode ?? "append",
+            }}
+          />
+        );
+      },
+    });
+  }
+
+  if (part.type === "tool-addToKnowledgeBase") {
+    const { toolCallId, state } = part;
+    if (state === "input-available") {
+      return <BasicToolInfo key={toolCallId} text="正在添加到知识库…" />;
+    }
+    if (state === "output-available") {
+      const { output } = part;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+      return <AddToKnowledgeBase key={toolCallId} args={part.input} />;
+    }
+  }
+
+  if (part.type === "tool-saveMemory") {
+    const { toolCallId, state } = part;
+
+    if (state === "input-available") {
+      return <BasicToolInfo key={toolCallId} text="正在保存记忆…" />;
+    }
+
+    if (state === "output-available") {
+      const { output } = part;
+      if (isOutputWithError(output)) {
+        return renderToolError(toolCallId, output);
+      }
+
+      const requiresConfirmation =
+        getOutputField<boolean>(output, "requiresConfirmation") === true &&
+        getOutputField<string>(output, "actionType") === "save_memory";
+
+      if (requiresConfirmation) {
+        return (
+          <PendingSaveMemoryToolCard
+            key={toolCallId}
+            output={output}
+            chatMessageId={messageId}
+            toolCallId={toolCallId}
+            disableConfirm={disableConfirm || !isPersistedMessage}
+          />
+        );
+      }
+
+      return <BasicToolInfo key={toolCallId} text="记忆已保存" />;
+    }
+  }
+
+  if (part.type === "tool-searchMemories") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在搜索记忆…",
+      renderSuccess: ({ toolCallId, output }) => {
+        const memories = getOutputField<Array<unknown>>(output, "memories");
+        const memoriesCount = Array.isArray(memories) ? memories.length : null;
+        if (memoriesCount === 0) {
+          return null;
+        }
+        return (
+          <BasicToolInfo
+            key={toolCallId}
+            text={`找到 ${memoriesCount ?? "matching"} 条记忆`}
+          />
+        );
+      },
+    });
+  }
+
+  if (part.type === "tool-getSenderCategoryOverview") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在检查发件人分类…",
+      renderSuccess: ({ toolCallId, output }) => (
+        <BasicToolInfo
+          key={toolCallId}
+          text={getSenderCategoryOverviewSuccessText(output)}
+        />
+      ),
+    });
+  }
+
+  if (part.type === "tool-startSenderCategorization") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在开始发件人分类…",
+      renderSuccess: ({ toolCallId, output }) => (
+        <BasicToolInfo
+          key={toolCallId}
+          text={getStartSenderCategorizationSuccessText(output)}
+        />
+      ),
+    });
+  }
+
+  if (part.type === "tool-getSenderCategorizationStatus") {
+    return renderToolStatus({
+      part,
+      loadingText: "正在检查分类进度…",
+      renderSuccess: ({ toolCallId, output }) => (
+        <BasicToolInfo
+          key={toolCallId}
+          text={getSenderCategorizationStatusSuccessText(output)}
+        />
+      ),
+    });
+  }
+
+  if (part.type === "tool-manageSenderCategory") {
+    const { toolCallId, state } = part;
+    if (state === "input-available") {
+      const categoryName = part.input.categoryName?.trim();
+      return (
+        <BasicToolInfo
+          key={toolCallId}
+          text={
+            categoryName ? `正在归档“${categoryName}”分类…` : "正在归档分类…"
+          }
+        />
+      );
+    }
+    if (state === "output-available") {
+      const failureMessage = getToolFailureMessage(part.output);
+      if (failureMessage) {
+        return <ErrorToolCard key={toolCallId} error={failureMessage} />;
+      }
+      return (
+        <ManageSenderCategoryResult key={toolCallId} output={part.output} />
+      );
+    }
+    return null;
+  }
+
+  if (part.type.startsWith("tool-")) {
+    const toolPart = part as {
+      type: `tool-${string}`;
+      toolCallId: string;
+      state: string;
+      output?: unknown;
+    };
+    const toolLabel = formatToolLabel(toolPart.type);
+    return renderToolStatus({
+      part: toolPart,
+      loadingText: `正在执行 ${toolLabel}…`,
+      renderSuccess: ({ toolCallId, output }) => (
+        <BasicToolInfo
+          key={toolCallId}
+          text={getToolSuccessMessage(output) ?? `Completed ${toolLabel}`}
+        />
+      ),
+    });
+  }
+
+  return null;
+}
+
+function getInProgressManageInboxOutput(input: {
+  action: string;
+  fromEmails?: string[] | null;
+}) {
+  return {
+    action: input.action,
+    senders: input.fromEmails ?? [],
+    sendersCount: input.fromEmails?.length ?? 0,
+  };
+}
+
+function getManageInboxInputForDisplay(
+  input: unknown,
+): ManageInboxInputForDisplay | null {
+  if (typeof input !== "object" || input === null) return null;
+
+  const value = input as Record<string, unknown>;
+  const action = normalizeManageInboxActionForDisplay(value.action);
+  if (!action) return null;
+
+  return {
+    action,
+    fromEmails: getOptionalStringArray(value.fromEmails),
+    label: getOptionalString(value.label),
+    labelName: getOptionalString(value.labelName ?? value.categoryName),
+    read: typeof value.read === "boolean" ? value.read : undefined,
+    threadIds: getOptionalStringArray(value.threadIds),
+  };
+}
+
+function normalizeManageInboxActionForDisplay(action: unknown) {
+  if (typeof action !== "string") return;
+  if (action === "categorize_threads") return "label_threads";
+  if (action === "remove_category_threads") return "remove_label_threads";
+  return isManageInboxAction(action) ? action : undefined;
+}
+
+function getOptionalString(value: unknown) {
+  return typeof value === "string" ? value : undefined;
+}
+
+function getOptionalStringArray(value: unknown) {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? value
+    : undefined;
+}
+
+function renderToolStatus({
+  part,
+  loadingText,
+  renderSuccess,
+}: {
+  part: {
+    toolCallId: string;
+    state: string;
+    output?: unknown;
+  };
+  loadingText: string;
+  renderSuccess: (args: { toolCallId: string; output: unknown }) => ReactNode;
+}) {
+  if (part.state === "input-available") {
+    return <BasicToolInfo key={part.toolCallId} text={loadingText} />;
+  }
+
+  if (part.state === "output-available") {
+    const failureMessage = getToolFailureMessage(part.output);
+    if (failureMessage) {
+      return <ErrorToolCard key={part.toolCallId} error={failureMessage} />;
+    }
+
+    return renderSuccess({ toolCallId: part.toolCallId, output: part.output });
+  }
+
+  return null;
+}
+
+function renderPendingEmailAction({
+  part,
+  disableConfirm,
+  isPersistedMessage,
+  messageId,
+  preparingText,
+  ResultComponent,
+}: {
+  part: {
+    toolCallId: string;
+    state: string;
+    output?: unknown;
+  };
+  disableConfirm: boolean;
+  isPersistedMessage: boolean;
+  messageId: string;
+  preparingText: string;
+  ResultComponent: (props: {
+    output: unknown;
+    chatMessageId: string;
+    toolCallId: string;
+    disableConfirm: boolean;
+  }) => ReactNode;
+}) {
+  const { toolCallId, state } = part;
+  if (state === "input-available") {
+    return <BasicToolInfo key={toolCallId} text={preparingText} />;
+  }
+
+  if (state === "output-available") {
+    const failureMessage = getToolFailureMessage(part.output);
+    if (failureMessage) {
+      return <ErrorToolCard key={toolCallId} error={failureMessage} />;
+    }
+
+    return (
+      <ResultComponent
+        key={toolCallId}
+        output={part.output}
+        chatMessageId={messageId}
+        toolCallId={toolCallId}
+        disableConfirm={disableConfirm || !isPersistedMessage}
+      />
+    );
+  }
+
+  return null;
+}
+
+function getToolFailureMessage(output: unknown): string | null {
+  return getUserVisibleToolFailureMessage(output);
+}
+
+function getToolSuccessMessage(output: unknown): string | null {
+  if (typeof output !== "object" || output === null) return null;
+  return toMessageString((output as Record<string, unknown>).message);
+}
+
+function getSenderCategoryOverviewSuccessText(output: unknown): string {
+  const categories = getOutputField<Array<unknown>>(output, "categories");
+  const categoryCount = Array.isArray(categories) ? categories.length : 0;
+  const uncategorized =
+    getOutputField<number>(output, "uncategorizedSenderCount") ?? 0;
+
+  if (categoryCount === 0 && uncategorized === 0) {
+    return "暂无发件人分类";
+  }
+
+  const parts: string[] = [];
+  if (categoryCount > 0) {
+    parts.push(
+      `${categoryCount} ${pluralize(categoryCount, "category", "categories")}`,
+    );
+  }
+  if (uncategorized > 0) {
+    parts.push(
+      `${uncategorized} uncategorized ${pluralize(uncategorized, "sender", "senders")}`,
+    );
+  }
+  return `找到 ${parts.join(", ")}`;
+}
+
+function getStartSenderCategorizationSuccessText(output: unknown): string {
+  const alreadyRunning = getOutputField<boolean>(output, "alreadyRunning");
+  const totalQueued = getOutputField<number>(output, "totalQueuedSenders") ?? 0;
+
+  if (alreadyRunning) {
+    return "发件人分类正在进行";
+  }
+  if (totalQueued > 0) {
+    return `正在分类：${totalQueued} ${pluralize(totalQueued, "sender", "senders")}`;
+  }
+  return "暂无待分类发件人";
+}
+
+function getSenderCategorizationStatusSuccessText(output: unknown): string {
+  const status = getOutputField<string>(output, "status");
+  const total = getOutputField<number>(output, "totalItems") ?? 0;
+  const completed = getOutputField<number>(output, "completedItems") ?? 0;
+
+  if (status === "completed") {
+    return "分类完成";
+  }
+  if (status === "running") {
+    return `正在分类发件人（${completed} / ${total}）`;
+  }
+  return "分类尚未开始";
+}
+
+function toMessageString(value: unknown): string | null {
+  if (typeof value === "string" && value.trim().length > 0) return value;
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "message" in value &&
+    typeof value.message === "string" &&
+    value.message.trim().length > 0
+  ) {
+    return value.message;
+  }
+  return null;
+}

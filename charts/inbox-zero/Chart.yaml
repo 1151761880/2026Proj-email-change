@@ -1,0 +1,16 @@
+apiVersion: v2
+name: inbox-zero
+description: A Helm chart for running 十组邮件小助手 on Kubernetes
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - inbox-zero
+  - email
+  - ai
+  - nextjs
+home: https://www.getinboxzero.com
+sources:
+  - https://github.com/elie222/inbox-zero
+maintainers:
+  - name: 十组邮件小助手
